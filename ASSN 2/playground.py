@@ -5,6 +5,7 @@
 #
 #
 from multiprocessing import Pool
+from multiprocessing import Process, Queue, JoinableQueue
 import logging
 import argparse
 import numpy as np
@@ -37,8 +38,18 @@ def nearestCentroid(datum, centroids):
     dist = np.linalg.norm(centroids - datum, axis=1)
     return np.argmin(dist), np.min(dist)
 
-def kmeans(nP, k, data, nr_iter=100):
 
+def func1(q1, N, data, centroids):
+   for i in range(N):
+       # Get index of closest centroid and closest distance
+       cluster, dist = nearestCentroid(data[i], centroids)
+       output = [i, cluster, dist]
+       q1.put(output)
+
+def func2():
+    None
+
+def kmeans(nP, k, data, nr_iter=100):
     # return total variation and list of centroids
     N = len(data)
 
@@ -47,6 +58,9 @@ def kmeans(nP, k, data, nr_iter=100):
     logging.debug("Initial centroids\n", centroids)
 
     N = len(data)
+
+
+
 
     # The cluster index: c[i] = j indicates that i-th datum is in j-th cluster
     c = np.zeros(N, dtype=int)
@@ -57,6 +71,7 @@ def kmeans(nP, k, data, nr_iter=100):
     # time
     t0 = 0
     t1 = 0
+
     for j in range(nr_iter):
         logging.debug("=== Iteration %d ===" % (j + 1))
 
@@ -64,37 +79,37 @@ def kmeans(nP, k, data, nr_iter=100):
         variation = np.zeros(k)
         cluster_sizes = np.zeros(k, dtype=int)
 
-        variation_temp = [[] for i in range(k)]
-        cluster_sizes_temp = [[] for i in range(k)]
+        # multiprocessing vars
+        processes = []
+        nr_process = 1
+        q1 = JoinableQueue()
+        q2 = JoinableQueue()
 
         #{--------------------------Parallelizable--------------------------
         # start measure time for loop 1
-        start_t1 = time.time()
-        for i in range(N):
 
-            # Get index of closest centroid and closest distance
-            cluster, dist = nearestCentroid(data[i], centroids)
-
-            # Assign point to centroid / cluster
-            c[i] = cluster
-
-            # update cluster's size
-            #cluster_sizes[cluster] += 1
-            cluster_sizes_temp[cluster].append(1)
-
-
-            # update variation of cluster
-            #variation[cluster] += dist ** 2
-            variation_temp[cluster].append(dist ** 2)
+        func1(q1, N, data, centroids)
         # stop measure time for loop 1
-        end_t1 = time.time()
-        t0 += end_t1 - start_t1
+
         #---------------------------Parallelizable--------------------------}
+        while not q1.empty():
+
+            start_t1 = time.time()
+            result = q1.get()
+            end_t1 = time.time()
+            t0 += end_t1 - start_t1
+
+            data_index = result[0]
+            cluster_index = result[1]
+            dist = result[2]
+
+            c[data_index] = cluster_index
+            cluster_sizes[cluster_index] += 1
+            variation[cluster_index] += dist ** 2
+
+            print("loop")
 
 
-        for i in range(k):
-            variation[i] = sum(variation_temp[i])
-            cluster_sizes[i] = sum(cluster_sizes_temp[i])
 
         delta_variation = -total_variation
         total_variation = sum(variation)
