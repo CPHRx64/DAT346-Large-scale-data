@@ -79,7 +79,7 @@ def kmeans(nP, k, data, nr_iter=100):
             c[i] = cluster
 
             # update cluster's size
-            cluster_sizes[cluster] += 1
+            #cluster_sizes[cluster] += 1
             cluster_sizes_temp[cluster].append(1)
 
 
